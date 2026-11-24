@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
-
   },
   "repository": {
     "type": "git",
@@ -21,6 +20,7 @@
   },
   "homepage": "https://github.com/natalievmedrano/Homework-7-3330#readme",
   "dependencies": {
+    "dotenv": "^18.0.10",
     "express": "^5.3.0",
     "pg": "^8.23.1"
   }
