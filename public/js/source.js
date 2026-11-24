@@ -1,201 +1,180 @@
+
 $(function () {
-    // *********************************************************************
-    // Feel free to modify/remove the JS objects below.
-    // *********************************************************************
 
-    let revenueAmt = "$35,800";
-    let customerNum = "1,284";
-    let ordersAmt = "342";
-    let issuesAmt = "12";
-    let username = "UTRGV Vaqueros";
-    let notifAmt = 3;
+    const username = "UTRGV Vaqueros";
 
-    const customers = [
-        {
-            "name": "Alice Johnson",
-            "email": "alice@example.com",
-            "status": "Active",
-            "joined": "09/10/2026"
-        },
-        {
-            "name": "Robert Smith",
-            "email": "robert@example.com",
-            "status": "Pending",
-            "joined": "09/12/2026"
-        },
-        {
-            "name": "Maria Garcia",
-            "email": "maria@example.com",
-            "status": "Active",
-            "joined": "09/15/2026"
+    $("#username").append(username);
+
+    function formatCurrency(amount) {
+        return Number(amount || 0).toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 0
+        });
+    }
+
+    async function loadDashboard() {
+        try {
+            const response = await fetch('/api/dashboard');
+            if (!response.ok) throw new Error('Dashboard request failed');
+
+            const data = await response.json();
+
+            $(".revenue-amt").text(formatCurrency(data.revenue));
+            $("#customer-num").text(data.customers.toLocaleString());
+            $("#orders-amt").text(data.orders.toLocaleString());
+            $("#issues-amt").text(data.issues.toLocaleString());
+            $("#notification-num").text(data.notifications);
+
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
         }
-    ];
+    }
 
-    const sales = [
-        {
-            "product": "Product A",
-            "quantity": "124",
-            "revenue": "$12,400"
-        },
-        {
-            "product": "Product B",
-            "quantity": "98",
-            "revenue": "$9,800"
-        },
-        {
-            "product": "Product C",
-            "quantity": "75",
-            "revenue": "$7,500"
-        },
-    ];
+    let currentPage = 1;
+    const pageLimit = 10;
 
-    const activities = [
-        {
-            "message" : "New customer registered"
-        },
-        {
-            "message" : "Order #10482 completed"
-        },
-        {
-            "message" : "Payment received"
-        },
-        {
-            "message" : "Support ticket created"
-        }
-    ];
+    async function loadCustomers(page = 1) {
+        try {
+            const response = await fetch(
+                `/api/customers?page=${page}&limit=${pageLimit}`
+            );
 
-    const messages = [
-        {
-            "messsage" : "All systems operational"
-        },
-        {
-            "messsage" : "All settings loaded for this system"
-        }
-    ];
+            if (!response.ok) throw new Error('Customer request failed');
 
-    const notifications = [
-        {
-            "messsage": "A new shipment is expected to arrive on Sep 30, 2026"
-        },
-        {
-            "messsage": "There are 12 outstanding issues with last week's orders"
-        },
-        {
-            "messsage": "Three new customers joined our platform in the last month"
-        },
-    ];
+            const data = await response.json();
 
-    const tasks = [
-       {
-            "messsage": "Review orders"
-        },
-        {
-            "messsage": "Contact customer"
-        },
-        {
-            "messsage": "Generate report"
-        },
-    ]
+            currentPage = data.page;
 
-    // There are 13 requirements to implement. 
-    const userNameObj = $("#username");
-    userNameObj.append(`${username}`);
+            const tableBody = $("#customerTableBody");
+            tableBody.empty();
 
-    const cardRevenue = $(".revenue-amt");   // this must select the class .revenue-amt, which will affect two elements. So count this 2 times.
-    cardRevenue.append(`${revenueAmt}`);
+            data.customers.forEach(customer => {
+                const row = $("<tr>");
 
-    const cardCustomers = $("#customer-num");
-    cardCustomers.append(`${customerNum}`);
+                const statusClass =
+                    customer.status.toLowerCase() === "active"
+                        ? "status-active"
+                        : "status-pending";
 
-    const cardOrders = $("#orders-amt");
-    cardOrders.append(`${ordersAmt}`);
+                const joinedDate = new Date(customer.datejoined)
+                    .toLocaleDateString("en-US", {
+                        timeZone: "UTC"
+                    });
 
-    const cardIssues = $("#issues-amt");
-    cardIssues.append(`${issuesAmt}`);
+                row.html(`
+                    <td>${customer.name}</td>
+                    <td>${customer.email}</td>
+                    <td>
+                        <span class="status ${statusClass}">
+                            ${customer.status}
+                        </span>
+                    </td>
+                    <td>${joinedDate}</td>
+                `);
 
-    const notificationNumber = $("#notification-num");
-    notificationNumber.append(`${notifAmt}`);
+                tableBody.append(row);
+            });
 
-    const tableBody = $("#customerTableBody");
+            let pagination = $("#customer-pagination");
 
-    customers.forEach(customer => {
-        const row = $("<tr>");
-
-        var statusClass;
-            if (customer.status.toLowerCase() === "active"){
-                statusClass = "status-active";
-            } else {
-                statusClass = "status-pending";
+            if (!pagination.length) {
+                pagination = $('<div id="customer-pagination"></div>');
+                $("#customerTable").after(pagination);
             }
-        row.html(`
-            <td>${customer.name}</td>
-            <td>${customer.email}</td>
-            <td>
-                <span class="status ${statusClass}">
-                    ${customer.status}
-                </span>
-            </td>
-            <td>${customer.joined}</td>
-        `);
 
-        tableBody.append(row);
-    });
+            pagination.empty();
 
-   
-    const salesTableBody = $("#salesTableBody");
+            pagination.append(`
+                <button id="previousPage"
+                    ${currentPage === 1 ? "disabled" : ""}>
+                    Previous
+                </button>
 
-    sales.forEach(sale => {
-        const row = $("<tr>");
+                <span>Page ${data.page} of ${data.totalPages}</span>
 
-        row.html(`
-            <td>${sale.product}</td>
-            <td>${sale.quantity}</td>
-            <td>${sale.revenue}</td>
-        `);
+                <button id="nextPage"
+                    ${currentPage >= data.totalPages ? "disabled" : ""}>
+                    Next
+                </button>
+            `);
 
-        salesTableBody.append(row);
-    });
+            $("#previousPage").button().on("click", function () {
+                loadCustomers(currentPage - 1);
+            });
 
-    const activityList = $("#activity-list");
+            $("#nextPage").button().on("click", function () {
+                loadCustomers(currentPage + 1);
+            });
 
-    activities.forEach(activity => {
-        const li = $("<li>");
-        li.html(`${activity.message}`);
-        activityList.append(li);
-    });
+        } catch (error) {
+            console.error('Error loading customers:', error);
+        }
+    }
 
- 
-    const systemStatusList = $("#system-status-list");
+    async function loadSales() {
+        try {
+            const response = await fetch('/api/sales');
+            if (!response.ok) throw new Error('Sales request failed');
 
-    messages.forEach(msg => {
-        const li = $("<li>");
-        li.html(`${msg.messsage}`);
-        systemStatusList.append(li);
-    });
+            const sales = await response.json();
 
+            const tableBody = $("#salesTableBody");
+            tableBody.empty();
 
-    const notificationsList = $("#notifications-list");
+            sales.forEach(sale => {
+                const row = $("<tr>");
 
-    notifications.forEach(notif => {
-        const li = $("<li>");
-        li.html(`${notif.messsage}`);
-        notificationsList.append(li);
-    });
+                row.html(`
+                    <td>${sale.name}</td>
+                    <td>${sale.quantity}</td>
+                    <td>${formatCurrency(sale.saleamount)}</td>
+                `);
 
+                tableBody.append(row);
+            });
 
-    const tasksList = $("#tasks-list");
+        } catch (error) {
+            console.error('Error loading sales:', error);
+        }
+    }
 
-    tasks.forEach(task => {
-        const li = $("<li>");
-        li.html(`${task.messsage}`);
-        tasksList.append(li);
-    });
+    async function loadAlerts(type, listId) {
+        try {
+            const response = await fetch(`/api/alerts/${type}`);
 
+            if (!response.ok) {
+                throw new Error(`Unable to load ${type}`);
+            }
 
-    // All six jQuery UI functions
+            const alerts = await response.json();
+
+            const list = $(listId);
+            list.empty();
+
+            alerts.forEach(alert => {
+                const li = $("<li>");
+                li.text(alert.description);
+                list.append(li);
+            });
+
+        } catch (error) {
+            console.error(`Error loading ${type}:`, error);
+        }
+    }
+
+    loadDashboard();
+    loadCustomers();
+    loadSales();
+
+    loadAlerts('issues', '#system-status-list');
+    loadAlerts('notifications', '#notifications-list');
+    loadAlerts('tasks', '#tasks-list');
+
+  
 
     $("button").button();
-       
+
     $("#dashboardTabs").tabs();
 
     $("#customerDate").datepicker();
@@ -211,36 +190,26 @@ $(function () {
         width: 450,
         buttons: {
             "Create Customer": function () {
-                var name = $("#customerName").val();
-                var email = $("#customerEmail").val();
+                const name = $("#customerName").val();
+                const email = $("#customerEmail").val();
+
                 if (!name || !email) {
-                    alert(
-                        "Please enter a name and email."
-                    );
+                    alert("Please enter a name and email.");
                     return;
                 }
 
                 alert("Customer created: " + name);
                 $(this).dialog("close");
             },
+
             "Cancel": function () {
                 $(this).dialog("close");
             }
         }
-
     });
 
-
-    $("#newCustomerButton").on(
-        "click",
-        function () {
-            $("#customerDialog").dialog("open");
-        }
-    );
-
-
-
-       
-
-
+    $("#newCustomerButton").on("click", function () {
+        $("#customerDialog").dialog("open");
     });
+
+});
